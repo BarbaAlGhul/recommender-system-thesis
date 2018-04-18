@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import keras
 from keras.utils import plot_model
 from keras.constraints import non_neg
-
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
-
+from sklearn.metrics import mean_squared_error
 import time
+import send_email
 
 
 # carrega o dataset
@@ -65,11 +65,13 @@ plt.draw()
 fig1.savefig('training_loss.png', dpi=200)
 
 # valores corretos baseados no modelo
-y_hat = np.round(model.predict([test.userId, test.movieId]), 0)
+y_pred = np.round(model.predict([test.userId, test.movieId]), 0)
 # valores estimados
 y_true = test.rating
 # imprime o "mean absolute error"
-print(mean_absolute_error(y_true, y_hat))
+print(mean_absolute_error(y_true, y_pred))
+# imprime o "mean squared error"
+print(mean_squared_error(y_true, y_pred))
 
 # mostra o tempo to treinamento no formato hh:mm:ss
 seconds = (time.time() - start_time)
@@ -86,9 +88,13 @@ print(pd.DataFrame(user_embedding_learnt).describe())
 # imprime os resultados em um arquivo
 with open('results.txt', 'w') as fr:
     fr.write('Tempo de execução: ' + str('%02d:%02d:%02d' % (h, m, s)) + '\n')
-    fr.write('\n' + 'Mean Absolute Error: ' + str(mean_absolute_error(y_true, y_hat)) + '\n')
+    fr.write('\n' + 'Mean Absolute Error: ' + str(mean_absolute_error(y_true, y_pred)) + '\n')
+    fr.write('\n' + 'Mean Squared Error: ' + str(mean_squared_error(y_true, y_pred)) + '\n')
     fr.write('\n' + 'Resultado do aprendizado dos filmes: ' + '\n' +
              str(pd.DataFrame(movie_embedding_learnt).describe()) + '\n')
     fr.write('\n' + 'Resultado do aprendizado dos usuários: ' + '\n' +
              str(pd.DataFrame(user_embedding_learnt).describe()) + '\n')
 fr.close()
+
+# manda um email com os resultados da execução
+send_email.send()
