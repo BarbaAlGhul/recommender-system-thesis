@@ -79,3 +79,9 @@ venv
 
 # Arquivos zip
 *.zip
+
+# pasta models e histories
+models/*
+histories/*
+!models/empty.txt
+!histories/empty.txt
