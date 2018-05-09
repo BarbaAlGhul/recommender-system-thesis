@@ -6,8 +6,8 @@ from email import encoders
 
 
 def send(files):
-    from_addr = "E-MAIL HERE"
-    to_addr = "E-MAIL HERE"
+    from_addr = "anderson.stan5@gmail.com"
+    to_addr = "anderson.stan5@gmail.com"
 
     msg = MIMEMultipart()
 
@@ -31,7 +31,7 @@ def send(files):
 
     server = smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
-    server.login(from_addr, "YOUR PASSWORD HERE")
+    server.login(from_addr, "cuoxaaiaaivqqsna")
     text = msg.as_string()
     server.sendmail(from_addr, to_addr, text)
     server.quit()
