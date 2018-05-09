@@ -71,8 +71,8 @@ fabric.properties
 
 # Arquivos de resultado da execução
 *.png
-model_summary*.txt
-results*.txt
+*.txt
+!requirements.txt
 
 # Virtualenv
 venv
