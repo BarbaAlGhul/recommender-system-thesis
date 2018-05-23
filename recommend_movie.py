@@ -30,8 +30,10 @@ movies = load_movies.load()
 ratings = load_ratings.load()
 
 # carrega o modelo
-model = load_model('models/autoencoder_2018_05_23_10_52.h5')
+model = load_model('models/NOME_DO_MODELO')
 
-recommendations = recommend(movies, ratings, model, 3)
+# entra com os dados do método e com o número do usuário
+user_id = 'ID DO USÁRIO'
+recommendations = recommend(movies, ratings, model, user_id)
 for elem in recommendations:
     print(elem)
