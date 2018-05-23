@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np
+from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
 import keras
 from keras import layers
@@ -7,32 +7,34 @@ from keras.utils import plot_model
 from keras.callbacks import ModelCheckpoint
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
 import time
 from time import localtime, strftime
 import send_email
 import pickle
+import load_movies
+import load_ratings
 
 
 # captura o tempo agora, somente para informação e análise dos resultados
 date_now = strftime("%d/%m/%Y %H:%M:%S", localtime())
 
-# carrega o dataset
-dataset = pd.read_csv('../ml-latest-small/ratings.csv')
-
-# atribui um único número (entre 0 e o número de usuários) para cada usuário e faz o mesmo para os filmes
-dataset.userId = dataset.userId.astype('category').cat.codes.values
-dataset.movieId = dataset.movieId.astype('category').cat.codes.values
+# carrega o dataset de ratings
+ratings = load_ratings.load('../')
+# carrega o dataset de filmes
+movies = load_movies.load('../')
 
 # divide o dataset em 80% para treinamento e 20% para teste
-train, test = train_test_split(dataset, test_size=0.2, random_state=0)
+train, test = train_test_split(ratings, test_size=0.2, random_state=0)
 
-n_users, n_movies = len(dataset.userId.unique()), len(dataset.movieId.unique())
+n_users, n_movies = len(ratings.userId.unique()), len(ratings.movieId.unique())
 
-embedding_size = 10
+embedding_size = 16
 
 # cria as camadas da rede neural
 movie_input = layers.Input(shape=[1], name='Movie')
 user_input = layers.Input(shape=[1], name='User')
+meta_input = layers.Input(shape=[1], name='Meta_movies')
 
 movie_embedding = layers.Embedding(input_dim=n_movies,
                                    input_length=1,
@@ -43,17 +45,20 @@ user_embedding = layers.Embedding(input_dim=n_users,
                                   output_dim=embedding_size,
                                   name='User-Embedding')(user_input)
 
-movie_vec = layers.Reshape([embedding_size])(movie_embedding)
-user_vec = layers.Reshape([embedding_size])(user_embedding)
+# movie_vec = layers.Reshape([embedding_size])(movie_embedding)
+# user_vec = layers.Reshape([embedding_size])(user_embedding)
+
+movie_vec = layers.Flatten()(movie_embedding)
+user_vec = layers.Flatten()(user_embedding)
 
 input_vecs = layers.Concatenate()([user_vec, movie_vec])
-
-dense_1 = layers.Dense(128, activation='relu')(input_vecs)
-dropout_1 = layers.Dropout(0.3)(dense_1)
+dense_1 = layers.Dense(64, activation='relu')(input_vecs)
+dense_1 = layers.Dropout(0.5)(dense_1)
+dense_1 = layers.Dense(32, activation='relu')(dense_1)
 dense_2 = layers.Dense(1)(dense_1)
 
 model = keras.Model(inputs=[user_input, movie_input], outputs=dense_2)
-model.compile(optimizer='adam', loss='mean_squared_error')
+model.compile(optimizer='adam', loss='mae')
 
 # cria uma imagem do modelo da rede
 plot_model(model, to_file='model_deep_learning.png', show_shapes=True)
@@ -64,7 +69,7 @@ with open('model_summary_deep_learning.txt', 'w') as f:
 f.close()
 
 # variável para guardar o número de epochs
-epochs = 25
+epochs = 20
 
 # salva os modelos de acordo com o callback do Keras
 save_path = '../models'
@@ -80,6 +85,7 @@ start_time = time.time()
 history = model.fit([train.userId, train.movieId],
                     train.rating,
                     epochs=epochs,
+                    batch_size=64,
                     verbose=2,
                     shuffle=True,
                     validation_split=0.1,
@@ -100,7 +106,7 @@ with open('../histories/' + history_name + '.pkl', 'wb') as file_pi:
 loss = history.history['loss']
 val_loss = history.history['val_loss']
 pd.Series(loss).plot(label='Training loss')
-pd.Series(val_loss).plot(label='Training val_loss')
+pd.Series(val_loss).plot(label='Validation loss')
 plt.title('Perda do treinamento')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
@@ -110,22 +116,26 @@ plt.show()
 plt.draw()
 fig1.savefig('training_loss_deep_learning.png', dpi=200)
 
-# valores baseados no modelo
-y_pred = np.round(model.predict([test.userId, test.movieId]), 0)
-# valores estimados
-y_true = test.rating
-# imprime o erro
-print('Erro: ' + str(mean_squared_error(y_true, y_pred)))
-# imprime a previsão do erro
-print('Previsão do erro: ' + str(mean_squared_error(y_true, model.predict([test.userId, test.movieId]))))
+# imprime a MSE e a MAE do teste e do treinamento
+test_preds = model.predict([test.userId, test.movieId])
+final_test_mse = "Final test MSE: %0.3f" % mean_squared_error(test_preds, test.rating)
+final_test_mae = "Final test MAE: %0.3f" % mean_absolute_error(test_preds, test.rating)
+print(final_test_mse)
+print(final_test_mae)
+train_preds = model.predict([train.userId, train.movieId])
+final_train_mse = "Final train MSE: %0.3f" % mean_squared_error(train_preds, train.rating)
+final_train_mae = "Final train MAE: %0.3f" % mean_absolute_error(train_preds, train.rating)
+print(final_train_mse)
+print(final_train_mae)
 
 # imprime os resultados em um arquivo
 with open('results.txt', 'w') as fr:
     fr.write('Data de treinamento da rede: ' + date_now + '\n')
     fr.write('\n' + 'Tempo de execução: ' + str('%02d:%02d:%02d' % (h, m, s)) + '\n')
-    fr.write('\n' + 'Mean Squared Error: ' + str(mean_squared_error(y_true, y_pred)) + '\n')
-    fr.write('\n' + 'Mean Squared Error Prediction: ' + str(
-        mean_squared_error(y_true, model.predict([test.userId, test.movieId]))) + '\n')
+    fr.write('\n' + str(final_test_mse) + '\n')
+    fr.write('\n' + str(final_test_mae) + '\n')
+    fr.write('\n' + str(final_train_mse) + '\n')
+    fr.write('\n' + str(final_train_mae) + '\n')
     fr.write('\n' + 'Número de Epochs da rede: ' + str(epochs) + '\n')
 fr.close()
 
