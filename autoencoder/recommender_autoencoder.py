@@ -33,7 +33,6 @@ embedding_size = 16
 # cria as camadas da rede neural
 movie_input = layers.Input(shape=[1], name='Movie')
 user_input = layers.Input(shape=[1], name='User')
-meta_input = layers.Input(shape=[1], name='Meta_movies')
 
 movie_embedding = layers.Embedding(input_dim=n_movies,
                                    input_length=1,
