@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import keras
 from keras import layers
@@ -8,24 +7,23 @@ from keras.constraints import non_neg
 from keras.callbacks import ModelCheckpoint
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
 import time
 from time import localtime, strftime
 import send_email
 import pickle
+import load_ratings
+import evaluate as evl
 
 
 # captura o tempo agora, somente para informação e análise dos resultados
 date_now = strftime("%d/%m/%Y %H:%M:%S", localtime())
 
-# carrega o dataset
-dataset = pd.read_csv('../ml-latest-small/ratings.csv')
-
-# atribui um único número (entre 0 e o número de usuários) para cada usuário e faz o mesmo para os filmes
-dataset.userId = dataset.userId.astype('category').cat.codes.values
-dataset.movieId = dataset.movieId.astype('category').cat.codes.values
+# carrega o dataset de ratings
+dataset = load_ratings.load('../')
 
 # divide o dataset em 80% para treinamento e 20% para teste
-train, test = train_test_split(dataset, test_size=0.2, random_state=0)
+train, test = train_test_split(dataset, test_size=0.3, random_state=0)
 
 n_users, n_movies = len(dataset.userId.unique()), len(dataset.movieId.unique())
 
@@ -50,7 +48,7 @@ user_embedding = layers.Embedding(input_dim=n_users,
 movie_vec = layers.Flatten(name='FlattenMovies')(movie_embedding)
 user_vec = layers.Flatten(name='FlattenUsers')(user_embedding)
 
-prod = keras.layers.dot([movie_vec, user_vec], axes=1, name='DotProduct')
+prod = layers.dot([movie_vec, user_vec], axes=1, name='DotProduct')
 model = keras.Model([user_input, movie_input], prod)
 model.compile(optimizer='adam', loss='mean_squared_error')
 
@@ -63,7 +61,14 @@ with open('model_summary.txt', 'w') as f:
 f.close()
 
 # variável para guardar o número de epochs
-epochs = 15
+epochs = 16
+
+test_map = evl.mean_average_precision(model, train, test)
+test_ndcg = evl.normalized_dcg(model, train, test)
+test_auc = evl.roc_auc(model, train, test)
+print("Check MAP: %0.4f" % test_map)
+print("Check NDCG: %0.4f" % test_ndcg)
+print("Check ROC_AUC: %0.4f" % test_auc)
 
 # salva os modelos de acordo com o callback do Keras
 save_path = '../models'
@@ -95,6 +100,13 @@ history_name = 'dense_' + my_time
 with open('../histories/' + history_name + '.pkl', 'wb') as file_pi:
     pickle.dump(history.history, file_pi)
 
+test_map = evl.mean_average_precision(model, train, test)
+test_ndcg = evl.normalized_dcg(model, train, test)
+test_auc = evl.roc_auc(model, train, test)
+print("MAP: %0.4f" % test_map)
+print("NDCG: %0.4f" % test_ndcg)
+print("ROC_AUC: %0.4f" % test_auc)
+
 # plota um gráfico da perda em relação às epochs e depois salva em uma imagem
 loss = history.history['loss']
 val_loss = history.history['val_loss']
@@ -109,32 +121,26 @@ plt.show()
 plt.draw()
 fig1.savefig('training_loss_matrix.png', dpi=200)
 
-# valores baseados no modelo
-y_pred = np.round(model.predict([test.userId, test.movieId]), 0)
-# valores estimados
-y_true = test.rating
-# imprime o erro
-print('Erro: ' + str(mean_squared_error(y_true, y_pred)))
-# imprime a previsão do erro
-print('Previsão do erro: ' + str(mean_squared_error(y_true, model.predict([test.userId, test.movieId]))))
-
-movie_embedding_learnt = model.get_layer(name='Movie-Embedding').get_weights()[0]
-print(pd.DataFrame(movie_embedding_learnt).describe())
-
-user_embedding_learnt = model.get_layer(name='User-Embedding').get_weights()[0]
-print(pd.DataFrame(user_embedding_learnt).describe())
+test_preds = model.predict([test.userId, test.movieId])
+final_test_mse = "Final test MSE: %0.3f" % mean_squared_error(test_preds, test.rating)
+final_test_mae = "Final test MAE: %0.3f" % mean_absolute_error(test_preds, test.rating)
+print(final_test_mse)
+print(final_test_mae)
+train_preds = model.predict([train.userId, train.movieId])
+final_train_mse = "Final train MSE: %0.3f" % mean_squared_error(train_preds, train.rating)
+final_train_mae = "Final train MAE: %0.3f" % mean_absolute_error(train_preds, train.rating)
+print(final_train_mse)
+print(final_train_mae)
 
 # imprime os resultados em um arquivo
 with open('results.txt', 'w') as fr:
     fr.write('Data de treinamento da rede: ' + date_now + '\n')
-    fr.write('Tempo de execução: ' + str('%02d:%02d:%02d' % (h, m, s)) + '\n')
-    fr.write('\n' + 'Mean Squared Error: ' + str(mean_squared_error(y_true, y_pred)) + '\n')
-    fr.write('\n' + 'Mean Squared Error Prediction: ' + str(
-        mean_squared_error(y_true, model.predict([test.userId, test.movieId]))) + '\n')
-    fr.write('\n' + 'Resultado do aprendizado dos filmes: ' + '\n' +
-             str(pd.DataFrame(movie_embedding_learnt).describe()) + '\n')
-    fr.write('\n' + 'Resultado do aprendizado dos usuários: ' + '\n' +
-             str(pd.DataFrame(user_embedding_learnt).describe()) + '\n')
+    fr.write('\n' + 'Tempo de execução: ' + str('%02d:%02d:%02d' % (h, m, s)) + '\n')
+    fr.write('\n' + str(final_test_mse) + '\n')
+    fr.write('\n' + str(final_test_mae) + '\n')
+    fr.write('\n' + str(final_train_mse) + '\n')
+    fr.write('\n' + str(final_train_mae) + '\n')
+    fr.write('\n' + 'Número de Epochs da rede: ' + str(epochs) + '\n')
 fr.close()
 
 # manda um email com os resultados da execução, passando como parâmetro arquivos para mandar como anexo

@@ -13,6 +13,7 @@ import send_email
 import pickle
 import load_movies
 import load_ratings
+import evaluate as evl
 
 
 # captura o tempo agora, somente para informação e análise dos resultados
@@ -24,7 +25,7 @@ ratings = load_ratings.load('../')
 movies = load_movies.load('../')
 
 # divide o dataset em 80% para treinamento e 20% para teste
-train, test = train_test_split(ratings, test_size=0.2, random_state=0)
+train, test = train_test_split(ratings, test_size=0.3, random_state=0)
 
 n_users, n_movies = len(ratings.userId.unique()), len(ratings.movieId.unique())
 
@@ -43,24 +44,24 @@ user_embedding = layers.Embedding(input_dim=n_users,
                                   output_dim=embedding_size,
                                   name='User-Embedding')(user_input)
 
-# movie_vec = layers.Reshape([embedding_size])(movie_embedding)
-# user_vec = layers.Reshape([embedding_size])(user_embedding)
-
 movie_vec = layers.Flatten()(movie_embedding)
 user_vec = layers.Flatten()(user_embedding)
 
 input_vecs = layers.Concatenate()([user_vec, movie_vec])
 encoded = layers.Dense(64, activation='relu')(input_vecs)
-encoded = layers.Dropout(0.5)(encoded)
 encoded = layers.Dense(32, activation='relu')(encoded)
-
 decoded = layers.Dense(64, activation='relu')(encoded)
-encoded = layers.Dropout(0.5)(decoded)
 decoded = layers.Dense(32, activation='relu')(decoded)
+
+encoded = layers.Dense(64, activation='relu')(decoded)
+encoded = layers.Dense(32, activation='relu')(encoded)
+decoded = layers.Dense(64, activation='relu')(encoded)
+decoded = layers.Dense(32, activation='relu')(decoded)
+
 decoded = layers.Dense(1, activation='relu')(decoded)
 
 model = keras.Model(inputs=[user_input, movie_input], outputs=decoded)
-model.compile(optimizer='adam', loss='mae')
+model.compile(optimizer='adam', loss='mse')
 
 # cria uma imagem do modelo da rede
 plot_model(model, to_file='model_autoencoder.png', show_shapes=True)
@@ -71,7 +72,15 @@ with open('model_summary_autoencoder.txt', 'w') as f:
 f.close()
 
 # variável para guardar o número de epochs
-epochs = 20
+epochs = 16
+
+# sanity check
+test_map = evl.mean_average_precision(model, train, test)
+test_ndcg = evl.normalized_dcg(model, train, test)
+test_auc = evl.roc_auc(model, train, test)
+print("Check MAP: %0.4f" % test_map)
+print("Check NDCG: %0.4f" % test_ndcg)
+print("Check ROC_AUC: %0.4f" % test_auc)
 
 # salva os modelos de acordo com o callback do Keras
 save_path = '../models'
@@ -103,6 +112,14 @@ print('%02d:%02d:%02d' % (h, m, s))
 history_name = 'dense_' + my_time
 with open('../histories/' + history_name + '.pkl', 'wb') as file_pi:
     pickle.dump(history.history, file_pi)
+
+
+test_map = evl.mean_average_precision(model, train, test)
+test_ndcg = evl.normalized_dcg(model, train, test)
+test_auc = evl.roc_auc(model, train, test)
+print("MAP: %0.4f" % test_map)
+print("NDCG: %0.4f" % test_ndcg)
+print("ROC_AUC: %0.4f" % test_auc)
 
 # plota um gráfico da perda em relação às epochs e depois salva em uma imagem
 loss = history.history['loss']

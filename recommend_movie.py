@@ -23,17 +23,18 @@ def recommend(movies, ratings, model, user_id, top_n=10):
     rating_preds = model.predict([user, movies_ids])
     movies_ids = np.argsort(rating_preds[:, 0])[::-1].tolist()
     rec_items = movies_ids[:top_n]
-    return [(movies['title'][movie], str(int(movies['year'][movie])), rating_preds[movie][0]) for movie in rec_items]
+    return [(str(movies['movieId'][movie]), movies['title'][movie], str(int(movies['year'][movie])),
+             rating_preds[movie][0]) for movie in rec_items]
 
 
 movies = load_movies.load()
 ratings = load_ratings.load()
 
 # carrega o modelo
-model = load_model('models/NOME_DO_MODELO')
+model = load_model('models/deep_learning_2018_06_12_10_31.h5')
 
 # entra com os dados do método e com o número do usuário
-user_id = 'ID DO USÁRIO'
+user_id = 10
 recommendations = recommend(movies, ratings, model, user_id)
 for elem in recommendations:
     print(elem)

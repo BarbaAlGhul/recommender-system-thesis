@@ -1,5 +1,4 @@
 import pandas as pd
-from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
 import keras
 from keras import layers
@@ -14,6 +13,7 @@ import send_email
 import pickle
 import load_movies
 import load_ratings
+import evaluate as evl
 
 
 # captura o tempo agora, somente para informação e análise dos resultados
@@ -25,11 +25,11 @@ ratings = load_ratings.load('../')
 movies = load_movies.load('../')
 
 # divide o dataset em 80% para treinamento e 20% para teste
-train, test = train_test_split(ratings, test_size=0.2, random_state=0)
+train, test = train_test_split(ratings, test_size=0.3, random_state=0)
 
 n_users, n_movies = len(ratings.userId.unique()), len(ratings.movieId.unique())
 
-embedding_size = 16
+embedding_size = 64
 
 # cria as camadas da rede neural
 movie_input = layers.Input(shape=[1], name='Movie')
@@ -44,16 +44,14 @@ user_embedding = layers.Embedding(input_dim=n_users,
                                   output_dim=embedding_size,
                                   name='User-Embedding')(user_input)
 
-# movie_vec = layers.Reshape([embedding_size])(movie_embedding)
-# user_vec = layers.Reshape([embedding_size])(user_embedding)
-
 movie_vec = layers.Flatten()(movie_embedding)
 user_vec = layers.Flatten()(user_embedding)
 
 input_vecs = layers.Concatenate()([user_vec, movie_vec])
 dense_1 = layers.Dense(64, activation='relu')(input_vecs)
-dense_1 = layers.Dropout(0.5)(dense_1)
+dense_1 = layers.Dropout(0.2)(dense_1)
 dense_1 = layers.Dense(32, activation='relu')(dense_1)
+dense_1 = layers.Dropout(0.1)(dense_1)
 dense_2 = layers.Dense(1)(dense_1)
 
 model = keras.Model(inputs=[user_input, movie_input], outputs=dense_2)
@@ -68,7 +66,7 @@ with open('model_summary_deep_learning.txt', 'w') as f:
 f.close()
 
 # variável para guardar o número de epochs
-epochs = 20
+epochs = 16
 
 # salva os modelos de acordo com o callback do Keras
 save_path = '../models'
@@ -76,6 +74,14 @@ my_time = time.strftime("%Y_%m_%d_%H_%M")
 model_name = 'deep_learning_' + my_time
 full_name = save_path + '/' + model_name + '.h5'
 m_check = ModelCheckpoint(full_name, monitor='val_loss', save_best_only=True)
+
+# sanity check
+test_map = evl.mean_average_precision(model, train, test)
+test_ndcg = evl.normalized_dcg(model, train, test)
+test_auc = evl.roc_auc(model, train, test)
+print("Check MAP: %0.4f" % test_map)
+print("Check NDCG: %0.4f" % test_ndcg)
+print("Check ROC_AUC: %0.4f" % test_auc)
 
 # começa a contar o tempo do treinamento
 start_time = time.time()
@@ -95,6 +101,13 @@ seconds = (time.time() - start_time)
 m, s = divmod(seconds, 60)
 h, m = divmod(m, 60)
 print('%02d:%02d:%02d' % (h, m, s))
+
+test_map = evl.mean_average_precision(model, train, test)
+test_ndcg = evl.normalized_dcg(model, train, test)
+test_auc = evl.roc_auc(model, train, test)
+print("MAP: %0.4f" % test_map)
+print("NDCG: %0.4f" % test_ndcg)
+print("ROC_AUC: %0.4f" % test_auc)
 
 # salva o treinamento
 history_name = 'dense_' + my_time

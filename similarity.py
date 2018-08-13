@@ -47,12 +47,12 @@ def most_similar(idx, embeddings, items, top_n=20, mode=None):
 movies = load_movies.load()
 
 # carrega o modelo
-model = load_model('models/NOME_DO_MODELO')
+model = load_model('models/deep_learning_2018_05_23_10_10.h5')
 weights = model.get_weights()
 item_embeddings = weights[1]
 
 # entra com o código de um filme
-movie_code = 'ID DO FILME'
+movie_code = 2744
 print("Itens próximos a " + str(movies.title[movie_code]) + '(' + str(int(movies.year[movie_code])) + ')' + ":")
 for title, dist in most_similar(2744, item_embeddings, movies, mode='euclidean'):
     print(title, dist)

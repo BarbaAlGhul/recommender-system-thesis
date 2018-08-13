@@ -24,7 +24,7 @@ def load(path=''):
     inverse_movies = {val: i for i, val in enumerate(movies.movieId.unique())}
     movies.movieId = movies.movieId.map(inverse_movies)
 
-    # organiza as informações dos dois arquivos
+    # organiza as informações do arquivo
     movies.sort_values(by='movieId', inplace=True)
     movies.reset_index(inplace=True, drop=True)
     return movies
