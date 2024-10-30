@@ -1,4 +1,6 @@
 ![license](https://img.shields.io/github/license/mashape/apistatus.svg)
+# IMPORTANT
+This project is now archived and won´t be mainteined anymore, i.e, there won´t be any more security patches.
 
 # Recommender System Thesis
 Deep Learning Recommender System
